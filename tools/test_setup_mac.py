@@ -94,6 +94,26 @@ class Recommendation(unittest.TestCase):
 
 
 class Config(unittest.TestCase):
+    def test_extended_context_reaches_metal_with_yarn_and_keeps_overrides(self):
+        from strata_control import mac_fit
+        base = (Path('/p'), [Path('/a1.gguf'), Path('/a2.gguf')], Path('/d/mtp/rt'))
+        for build in (M.engine_args, mac_fit.engine_args):
+            for ctx, factor in ((262144, None), (524288, '2'), (1048576, '4')):
+                with self.subTest(build=build.__module__, context=ctx):
+                    args = build(*base, ctx)
+                    self.assertEqual(args[args.index('--max-context') + 1], str(ctx))
+                    if factor is None:
+                        self.assertNotIn('--rope-scaling', args)
+                        self.assertNotIn('--rope-scale', args)
+                    else:
+                        self.assertEqual(args[args.index('--rope-scaling') + 1], 'yarn')
+                        self.assertEqual(args[args.index('--rope-scale') + 1], factor)
+            args = build(*base, 1048576, scaling='linear', scale=5)
+            self.assertEqual(args[args.index('--rope-scaling') + 1], 'linear')
+            self.assertEqual(args[args.index('--rope-scale') + 1], '5')
+            with self.assertRaises(ValueError):
+                build(*base, 1048576, scaling='none')
+
     def test_engine_args_carry_the_metal_defaults(self):
         args = M.engine_args(Path("/p/packs/q2_0"), [Path("/m/a-00001.gguf"), Path("/m/a-00002.gguf")],
                              Path("/d/mtp/rt"), 32768)
@@ -398,6 +418,23 @@ class ControlMode(unittest.TestCase):
     def config(self, tag="q2_0"):
         import json
         return json.loads((self.home / f"strata-{tag}.json").read_text(encoding="utf-8"))
+
+    def test_one_million_context_is_saved_with_yarn(self):
+        rc, _ = self.run_setup(argv=('--yes', '--no-start', '--family', 'qwen', '--model', 'Q2_0',
+                                     '--context', '1048576'))
+        self.assertEqual(rc, 0)
+        args = self.config()['args']
+        self.assertEqual(args[args.index('--max-context') + 1], '1048576')
+        self.assertEqual(args[args.index('--rope-scaling') + 1], 'yarn')
+        self.assertEqual(args[args.index('--rope-scale') + 1], '4')
+
+    def test_control_mode_keeps_explicit_rope_settings(self):
+        rc, _ = self.run_setup(argv=('--yes', '--no-start', '--model', 'Q2_0', '--context', '1048576',
+                                     '--rope-scaling', 'linear', '--rope-scale', '5'))
+        self.assertEqual(rc, 0)
+        args = self.config()['args']
+        self.assertEqual(args[args.index('--rope-scaling') + 1], 'linear')
+        self.assertEqual(args[args.index('--rope-scale') + 1], '5')
 
     def test_the_install_writes_a_run_config_for_the_engine_component(self):
         rc, ran = self.run_setup()

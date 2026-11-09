@@ -637,6 +637,17 @@ tables per token). The scaling is fixed for the whole run, because the KV cache 
 - Within the trained range a scaled run is a slightly different model, so setup turns scaling on only past 262,144.
   Pictures read the same scaled table; that is unmeasured, and the evidence in History is all text.
 
+The app and Terminal offer **1M** for Qwen3.8-Flash-Next and its variants. In Strata, this is 1,048,576 tokens
+(including input and output), with YaRN factor 4. The default stays 128K. For example:
+
+```sh
+strata launch --family qwen --model iq3_xxs --context 1m --yes --no-tui
+```
+
+Mac setup also adds YaRN past 256K. The configuration uses the same rules as NVIDIA, AMD and Intel setup;
+1M inference on Metal has not been validated here. Longer contexts need more memory and may make answers less reliable.
+Qwen3.6 uses a separate engine path without YaRN; this change does not add a 1M choice for it.
+
 ### Network access
 
 - **Local only by default** (`127.0.0.1`). For other devices on your network run setup with

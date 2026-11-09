@@ -26,6 +26,7 @@ import { tunedFields } from '../lib/tune-values';
 import { shownVision, steadyNoReader } from '../lib/pictures-choice';
 import { draftingChoices as draftingOptions, resolveDrafter } from '../lib/drafting';
 import { deepseekContexts, deepseekContextNote } from '../lib/deepseek-context';
+import { qwenContexts, QWEN_CONTEXT_NOTE } from '../lib/qwen-context';
 import { NativeSettings } from './NativeSettings';
 import { NativeSettingsFile } from './NativeSettingsFile';
 import { RunImageModel } from './RunImageModel';
@@ -71,7 +72,7 @@ export function NativeModels({ onOtherModels, onReady, onImport, onConnectEngine
     const selectedFamily = families.find(f => f.family === family || f.sizes.some(size => size.sourceFamily === family)) ?? families[0], selectedSize = selectedFamily?.sizes.find(s => s.id === size) ?? selectedFamily?.sizes[0];
     const installed = native?.installed?.models.find(m => m.model === selectedSize?.id), listPending = installedListPending(native);
     // The sizes this model offers for the conversation context; it opens at 128K (or its largest size when that is smaller).
-    const contextList = selectedSize?.multi_file ? deepseekContexts(installed?.contextMax) : native?.catalog?.contexts ?? [8192, 32768, 65536, 131072, 262144];
+    const contextList = selectedSize?.multi_file ? deepseekContexts(installed?.contextMax) : qwenContexts(native?.catalog?.contexts, selectedSize?.sourceFamily);
     // The model that is running is shown as running, with Unload: not offered for loading again.
     const downloaded = native?.installed?.models ?? [], allSizes = families.flatMap(f => f.sizes);
     // This computer for the fit figures: the biggest usable graphics card, or the ones chosen under Expert settings.
@@ -253,8 +254,9 @@ export function NativeModels({ onOtherModels, onReady, onImport, onConnectEngine
       <div className="native-version"><VersionPicker pick={native?.catalog?.recommendation} versions={selectedFamily?.sizes ?? []} details={expert} selectedId={selectedSize.id} hardware={fitHardware} cache={{ context, kv, drafter: fitDrafter }} downloaded={readyIds} onSelect={id => { const f = families.find(f => f.sizes.some(s => s.id === id)); if (f) { setFamily(f.family); setSize(id); setError(''); } }} onOwnGguf={() => (onImport ?? onOtherModels)()}/></div>
       {tr(fitState === 'ssd' ? <p className="small muted native-spill-note"><Icon name="disk" size={16}/>{tr("SSD streaming · will run slower")}</p> : fitState === 'no' ? <p className="small muted native-spill-note"><Icon name="warning" size={16}/>{tr("Doesn't fit")}</p> : null)}
       {tr(selectedSize?.multi_file && deepseekContextNote(context) ? <p className="small muted native-spill-note"><Icon name="info" size={16}/>{tr(deepseekContextNote(context))}</p> : null)}
+      {tr(!selectedSize?.multi_file && selectedSize?.sourceFamily !== 'qwen36' && context > 262144 ? <p className="small muted native-spill-note"><Icon name="info" size={16}/>{tr(QWEN_CONTEXT_NOTE)}</p> : null)}
       <div className="native-choice__row">
-       <div className="native-choice__col"><span className="native-choice__label">{tr("Conversation context")}</span><Select ariaLabel={tr("Conversation context")} value={String(context)} options={contextChoices(contextList, context).map(n => ({ value: String(n), label: n % 1024 === 0 ? `${n / 1024}K` : `${n.toLocaleString()} tokens` }))} onChange={n => { setContextPicked(true); setContext(Number(n)); }}/></div>
+       <div className="native-choice__col"><span className="native-choice__label">{tr("Conversation context")}</span><Select ariaLabel={tr("Conversation context")} value={String(context)} options={contextChoices(contextList, context).map(n => ({ value: String(n), label: n === 1048576 ? '1M' : n % 1024 === 0 ? `${n / 1024}K` : `${n.toLocaleString()} tokens` }))} onChange={n => { setContextPicked(true); setContext(Number(n)); }}/></div>
        {tr(draftingChoices ? <div className="native-choice__col"><span className="native-choice__label">{tr("Drafting")}</span><Select ariaLabel={tr("Drafting")} value={drafting} disabled={!!active} options={draftingChoices.map(v => ({ value: v, label: tr(draftingWords[v]) }))} onChange={v => setDrafting(String(v))}/></div> : null)}
        <div className="native-choice__col"><span className="native-choice__label">{tr("Computer use")}</span><div className="native-resource-choice"><button aria-pressed={resourceProfile === 'work'} data-selected={resourceProfile === 'work'} onClick={() => setResourceProfile('work')}><Icon name="computer" size={20}/><span><strong>{tr("Leave room for my work")}</strong><small>{tr("Keeps 5-8 GB of memory free for other programs.")}</small></span>{tr(resourceProfile === 'work' ? <Icon name="check" size={15}/> : null)}</button><button aria-pressed={resourceProfile === 'performance'} data-selected={resourceProfile === 'performance'} onClick={() => setResourceProfile('performance')}><Icon name="bolt" size={20}/><span><strong>{tr("Full performance")}</strong><small>{tr("Give Strata priority")}</small></span>{tr(resourceProfile === 'performance' ? <Icon name="check" size={15}/> : null)}</button></div></div>
       </div>

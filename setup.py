@@ -68,6 +68,7 @@ from strata_control import tls
 tls.install()      # #3722: HTTPS checks the server against the operating system's certificates (what Chrome and curl.exe do)
 from strata_control import atomic
 from strata_control import draft_layer
+from strata_control.rope import derived_factor, resolve_rope
 from strata_control import dsv41_context
 from strata_control import engine_component
 from strata_control import sysinfo
@@ -686,7 +687,7 @@ UNSLOTH_MIN_RAM_GB = 48         # the RAM-budget mode below which setup says an 
 # the trained range are out of spec.
 # 204800 (200K) sits between 128K and 256K: it is inside the trained 262144, so it needs no rope scaling and
 # costs ~2.8 GB of 8-bit KV with IQ3_S (vs ~3.6 GB at 256K) - a middle step for PCs that cannot hold 256K.
-CONTEXTS = [8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288]
+CONTEXTS = [8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288, 1048576]
 # The model families: the same architecture, weights in the same three GSQ-RCO sizes, different files.
 FAMILIES = {
     "qwen": {"title": "Qwen3.8-Flash-Next", "by": "Qwen; GSQ-RCO quants by ISTA-DASLab",
@@ -8190,45 +8191,6 @@ def write_run_script(model, cfg_path, port, open_browser=True):
     return script
 
 
-# ------------------------------------------------------------------------------------------------ the rope config
-def derived_factor(ctx: int, trained: int = 262144) -> float:
-    """The automatic extension factor: the FINAL context over the trained one, at least 1.
-
-    Factor 1 removes the automatic expansion - the trained angles stand as they are - but it is not a
-    switch for rope as a whole: an explicitly chosen method's settings keep their defined behavior.
-    """
-    return max(1.0, float(ctx) / float(trained))
-
-
-def resolve_rope(ctx: int, scaling, scale, trained: int = 262144):
-    """The rope config for the context ACTUALLY SERVED: (scaling, scale); scaling None = no scaling flags.
-
-    An explicit --rope-scaling/--rope-scale always wins - a valid user-supplied factor is kept verbatim even
-    when a reduction changed the context.  Past the trained range an omitted method defaults to yarn -
-    llama.cpp's extension method: the trained angles survive on the high-frequency pairs and the
-    magnitude correction keeps the attention temperature - and an omitted factor is derived from the
-    final context (final / trained, at least 1), as is an explicitly chosen method's missing factor
-    inside the trained range: factor 1, the trained angles, no expansion.  An explicit none is refused
-    past the trained range (the setup will not configure a run it knows is out of spec) rather than
-    silently overridden.
-    """
-    if scale is not None and (not math.isfinite(scale) or scale < 1.0):
-        raise ValueError("--rope-scale must be a finite value >= 1, e.g. --rope-scale 4")
-    if ctx <= trained:
-        if scale is not None and scaling in (None, "none"):
-            raise ValueError("--rope-scale needs --rope-scaling linear or yarn (the chosen context fits the "
-                             "trained 262144, so there is nothing to scale)")
-        if scaling in (None, "none"):
-            return None, None          # the stock model, by choice or by default
-        return scaling, scale if scale is not None else derived_factor(ctx, trained)
-    if scaling == "none":
-        raise ValueError(f"a {ctx // 1024}K context is past the model's trained 262144, and --rope-scaling none "
-                         "keeps the stock angles there - the model has never seen those positions, so the setup "
-                         "refuses the combination instead of quietly overriding it. Pick --rope-scaling yarn or "
-                         "linear, or rerun with --context 262144 or lower")
-    return scaling or "yarn", scale if scale is not None else derived_factor(ctx, trained)
-
-
 # ------------------------------------------------------------------------------------------------ main
 def mac_setup(argv) -> int:
     """A Mac (Apple Silicon): the Metal engine, built from source on the Mac by metal/setup_mac.py (its own steps:
@@ -9763,6 +9725,10 @@ def mac_control_setup(a) -> int:
         warn(n)
     vision = mac_vision(a.vision, model, ram)
     ctx = a.context or MF.recommend_context(ram)
+    try:
+        scaling, rope_scale = resolve_rope(ctx, a.rope_scaling, a.rope_scale)
+    except ValueError as e:
+        fail(str(e))
     if ctx > MF.TESTED_CONTEXT:
         say(f"  context {ctx}: measured on the Mac up to {MF.TESTED_CONTEXT} (needles found at 8K-32K); longer is kept")
     ok(f"{model}, context {ctx}")
@@ -9886,7 +9852,8 @@ def mac_control_setup(a) -> int:
 
     step(7, "writing the run settings")
     port = a.port or 8080
-    args = MF.engine_args(pack, shards, rt, ctx, stream, ram, ROOT / "data" / "expert-profile.bin", model)     # Unsloth: --native the repacked file, --ple-gguf the table's shard
+    args = MF.engine_args(pack, shards, rt, ctx, stream, ram, ROOT / "data" / "expert-profile.bin", model,
+                          scaling, rope_scale)     # Unsloth: --native the repacked file, --ple-gguf the table's shard
     cfg = {"exe": engine_exe(Path("engine")), "args": args, "cwd": str(ROOT), "tokenizer": str(pack / "tokenizer"),
            "model_name": f"{fam['name']}-{model.lower()}", "log": str(home() / f"strata-{tag.lower()}.log"),
            "lib_dirs": [], "port": port, "backend": "metal", "env": {"STRATA_METAL_STREAM": "1" if stream else "0"}}
@@ -10635,7 +10602,8 @@ def main() -> int:
                    ("   (experimental: setup adds rope scaling)" if c > 262144 else "") + \
                    (f"   (needs ~{need_c:.0f} GB RAM, this PC has {ram:.0f}: may run out of memory)"
                     if c > 131072 and need_c is not None and need_c > ram else "")
-            say(f"  {i}) {c // 1024}K tokens{note}")
+            size = "1M" if c == 1048576 else f"{c // 1024}K"
+            say(f"  {i}) {size} tokens{note}")
         ctx = CONTEXTS[int(ask("Context?", [str(i) for i in range(1, len(CONTEXTS) + 1)],
                                str(CONTEXTS.index(rec_ctx) + 1), a.yes)) - 1]
     # #406 #364: a context past the RAM rule (an explicit --context, a pick in the list, or the earlier install's) is

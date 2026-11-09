@@ -367,10 +367,12 @@ class Catalog:
 
     def contexts_for(self, family: str | None, model: str | None = None) -> list[int]:
         """The context sizes to offer for this model: DeepSeek-V4.1-Flash goes up to 1M (its installed pack's own limit when it has one), the
-        others keep the shared list."""
+        Flash-Next uses the shared list; Qwen3.6 keeps its previous choices without the new 1M entry."""
         if family and self.strata.multi_family(family):
             from strata_control import dsv41_context
             return dsv41_context.choices(self.pack_limit(family, model))
+        if family == "qwen36":
+            return [c for c in self.contexts() if c <= 524288]  # no YaRN on this path; keep its existing choices
         return self.contexts()
 
     def pack_limit(self, family: str | None, model: str | None) -> int | None:

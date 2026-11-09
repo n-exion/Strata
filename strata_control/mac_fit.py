@@ -12,6 +12,8 @@ import platform
 import subprocess
 from pathlib import Path
 
+from strata_control.rope import resolve_rope
+
 MIN_MACOS = (15, 0)        # MTLResidencySet (the engine keeps every buffer resident through one)
 
 # The Mac's packs.  shard1_gb: the file the GPU maps (resident in unified memory while the model runs); the n-gram
@@ -261,7 +263,8 @@ def stream_mtp(stream: bool, ram_gb: float) -> bool:
 
 
 def engine_args(pack: Path, shards: list, rt: Path, ctx: int, stream: bool = False, ram_gb: float = 0.0,
-                profile: Path | str = "data/expert-profile.bin", model: str = "") -> list[str]:
+                profile: Path | str = "data/expert-profile.bin", model: str = "",
+                scaling: str | None = None, scale: float | None = None) -> list[str]:
     """The Metal defaults: --spec 2 with the MTP draft layer (measured best on the M5 Max, docs/MAC.md) and the Q8_0
     hyper-connection read (the engine's default on Metal; STRATA_HC_Q8=0 in the config's env gives the exact BF16
     read).  Streaming from the SSD: one token per step, no draft layer (measured faster on the 32 GB M4); a streaming
@@ -275,5 +278,8 @@ def engine_args(pack: Path, shards: list, rt: Path, ctx: int, stream: bool = Fal
             "--prefill", "auto", *spec_args(model, stream, mtp)]
     args += ["--suffix-draft", "0"] if stream else []
     args += ["--mtp", str(rt)] if mtp else []
+    method, factor = resolve_rope(ctx, scaling, scale)
+    if method is not None:
+        args += ["--rope-scaling", method, "--rope-scale", f"{factor:g}"]
     return args + ["--max-context", str(ctx),
                    "--mmap-experts"]   # what the Metal engine does anyway (the GGUF mapped in place); the server says so

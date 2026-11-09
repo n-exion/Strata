@@ -111,7 +111,8 @@ API on `http://127.0.0.1:8080/v1`, the Anthropic API on `/v1/messages`, and the 
 | `--model Q2_0\|IQ3_XXS\|IQ3_S\|UD-Q4_K_XL\|UD-Q5_K_XL\|UD-Q6_K_XL\|Gyro-S\|Gyro-M` | The pack. The `UD-` files are Unsloth's. |
 | `--family qwen\|unsloth\|gyro` | The model family. |
 | `--vision yes\|no\|gpu\|cpu` | Picture reader. |
-| `--context N`, `--port`, `--host`, `--api-key` | Server settings. |
+| `--context N`, `--port`, `--host`, `--api-key` | Server settings. Past 262,144 tokens, Qwen Flash-Next setup adds experimental YaRN extension. The app and Terminal offer 1M (1,048,576 tokens); 1M inference on Metal is not validated here. |
+| `--rope-scaling none\|linear\|yarn`, `--rope-scale F` | Override context extension in source setup. `none` is refused past 262,144 tokens. |
 | `--draft-vocab`, `--no-browser` | Draft vocabulary; do not open the browser. |
 | `--data-dir`, `--models-dir`, `--gguf-dir` | Where files go, or where yours are. |
 | `--setup`, `--no-start`, `--check`, `--build` | Choose another model or settings; install only; only check the Mac; build the engine again. |

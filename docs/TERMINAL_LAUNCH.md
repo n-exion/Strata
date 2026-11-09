@@ -90,7 +90,7 @@ strata launch --show-key
 | `--family`, `--model` | The model family and size, for example `qwen`, `q2_0`. Any case. |
 | `--model-path PATH` | Use model files you already have: a folder of shards or one `.gguf`. |
 | `--data-dir DIR`, `--move-data` | Where new downloads go. `--move-data` also moves the models you already have. |
-| `--context SIZE` | `32k`, `64k`, `128k`, `256k` or a number of tokens. |
+| `--context SIZE` | `32k`, `64k`, `128k`, `256k`, `512k`, `1m` or a number of tokens. Qwen Flash-Next uses experimental YaRN extension past 256K. `1m` is 1,048,576 tokens. |
 | `--kv FORMAT` | Conversation memory format: `int8` (default), `q4_0` (half the memory), `k8v4`, `fp16`. |
 | `--vision off\|on\|gpu\|cpu` | Picture reading. Default: on when the model and the engine can. |
 | `--parallel N` | Requests answered at the same time, 1 to 8. Default: fit to your card; DeepSeek: one at a time. |

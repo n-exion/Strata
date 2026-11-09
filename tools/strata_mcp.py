@@ -136,7 +136,7 @@ MEMORY_TIERS = ((62.0, "qwen", "IQ3_S"), (46.0, "qwen", "IQ3_XXS"), (38.0, "swif
 # #3425 (owner's rule, same as setup.py's TIER_SYSTEM_RESERVE_GB): the floors count RAM + VRAM less the 5 GB Windows and the system keep
 TIER_SYSTEM_RESERVE_GB = 5.0
 GYRO_ROOM_GB = 4.0     # recommend() suggests a Gyro size only when VRAM + RAM exceed its memory figure by this much
-FALLBACK_CONTEXTS = [8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288]
+FALLBACK_CONTEXTS = [8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288, 1048576]
 BENCH_PROMPT = ("Write a short story (about 300 words) about a lighthouse keeper who finds a message in a bottle. "
                 "Plain prose, no title.")
 

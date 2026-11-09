@@ -24,6 +24,7 @@ class DerivedFactor(unittest.TestCase):
         self.assertEqual(setup.derived_factor(262144), 1.0)        # exactly the trained range: 1
         self.assertEqual(setup.derived_factor(393216), 1.5)        # 384K
         self.assertEqual(setup.derived_factor(524288), 2.0)        # 512K
+        self.assertEqual(setup.derived_factor(1048576), 4.0)      # 1M
 
     def test_free_form_contexts_get_the_exact_ratio(self):
         # /262144 = /2**18 is exact in binary floating point, so no dust
@@ -56,6 +57,10 @@ class ResolveRope(unittest.TestCase):
 
     def test_omitted_512k_gets_yarn_and_2(self):
         self.assertEqual(setup.resolve_rope(524288, None, None), ("yarn", 2.0))
+
+    def test_one_million_choice_gets_yarn_and_4(self):
+        self.assertIn(1048576, setup.CONTEXTS)
+        self.assertEqual(setup.resolve_rope(1048576, None, None), ('yarn', 4.0))
 
     def test_deterministic_for_yes(self):
         # --yes never prompts, so the resolution must be a pure function of its inputs

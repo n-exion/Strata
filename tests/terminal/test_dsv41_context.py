@@ -85,11 +85,12 @@ class Terminal(unittest.TestCase):
             self.assertEqual(code, 0, err + out)
         return code, out, err
 
-    def test_the_context_step_offers_8K_to_1M_for_deepseek_and_keeps_the_others(self):
+    def test_the_context_step_offers_1m_for_deepseek_and_flash_next(self):
         cat = catalog(HW_4X32)
         self.assertEqual(cat.contexts_for("deepseek41", "UD-Q8_K_XL"), list(C.CHOICES))
-        self.assertEqual(cat.contexts_for("qwen", "IQ3_S"), cat.contexts(), "Qwen's choices stay as they are")
-        self.assertNotIn(1048576, cat.contexts_for("qwen", "IQ3_S"))
+        self.assertEqual(cat.contexts_for("qwen", "IQ3_S"), cat.contexts())
+        self.assertIn(1048576, cat.contexts_for("qwen", "IQ3_S"))
+        self.assertNotIn(1048576, cat.contexts_for("qwen36", "UD-Q4_K_XL"))
 
     def test_the_flag_takes_512k_and_1m(self):
         for text, tokens in (("512k", 524288), ("1m", 1048576), ("524288", 524288), ("1048576", 1048576)):
@@ -97,6 +98,12 @@ class Terminal(unittest.TestCase):
             plan = json.loads(out)["plan"]
             self.assertEqual(plan["settings"]["context"], tokens, text)
             self.assertTrue(any("Not tested yet" in n["text"] for n in plan["notices"]) if "notices" in plan else "Not tested yet" in out, text)
+
+    def test_qwen_one_million_plan_keeps_the_choice_and_warns_about_extension(self):
+        code, out, err = self.plan('--family', 'qwen', '--model', 'iq3_s', '--context', '1m', '--no-tui')
+        plan = json.loads(out)['plan']
+        self.assertEqual(plan['settings']['context'], 1048576)
+        self.assertIn('rope scaling', out)
 
     def test_two_million_is_refused_with_a_plain_sentence(self):
         code, out, err = self.plan("--model", "ud-q8_k_xl", "--context", "2m", "--no-tui", ok=False)

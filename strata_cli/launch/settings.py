@@ -18,7 +18,7 @@ from typing import Any
 SCHEMA = "strata.launch/1"
 
 #: setup.py's CONTEXTS (kept here only as the fallback when the installer files are not next to this terminal).
-FALLBACK_CONTEXTS = (8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288)
+FALLBACK_CONTEXTS = (8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288, 1048576)
 
 ACCESS_KINDS = ("local", "lan", "cloudflare", "tailscale")
 ACCESS_WORDS = {"local": "This computer only", "lan": "My local network", "cloudflare": "Cloudflare tunnel",
